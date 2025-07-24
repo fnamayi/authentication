@@ -7,11 +7,13 @@ import (
 
 // User represents a forum user
 type User struct {
-	ID         string
-	Username   string
-	Email      string
-	Password   string
-	ProfilePic sql.NullString
+	ID           string
+	Username     string
+	Email        string
+	Password     string
+	ProfilePic   sql.NullString
+	OAuthProvider sql.NullString
+	OAuthID      sql.NullString
 }
 
 // Post represents a user's post for profile viewing

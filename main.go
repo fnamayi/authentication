@@ -151,6 +151,18 @@ func main() {
 	postHandler := posts.NewPostHandler(postService, templates)
 	authHandler := auth.NewAuthHandler(database, templates)
 	commentHandler := comments.NewCommentHandler(database)
+	
+	// Initialize OAuth handler
+	oauthHandler := auth.NewOAuthHandler(database, authHandler)
+	
+	// Register OAuth routes with middleware
+	http.HandleFunc("/auth/google/login", logRequest(oauthHandler.GoogleLoginHandler))
+	http.HandleFunc("/auth/google/callback", logRequest(oauthHandler.GoogleCallbackHandler))
+	http.HandleFunc("/auth/github/login", logRequest(oauthHandler.GitHubLoginHandler))
+	http.HandleFunc("/auth/github/callback", logRequest(oauthHandler.GitHubCallbackHandler))
+	
+	// Initialize OAuth configuration
+	auth.InitOAuthConfig("http://localhost:3000")
 
 	// Register routes
 	http.HandleFunc("/", logRequest(ServeHome))

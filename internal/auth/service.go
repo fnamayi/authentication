@@ -15,11 +15,10 @@ func GetUserByID(db *sql.DB, userID string) (*User, error) {
 	log.Printf("Fetching user with ID: %s", userID)
 
 	var user User
-	var profilePic sql.NullString
 	err := db.QueryRow(
-		"SELECT id, username, email, COALESCE(profile_pic, '') as profile_pic FROM users WHERE id = ?",
+		"SELECT id, username, email, profile_pic, oauth_provider, oauth_id FROM users WHERE id = ?",
 		userID,
-	).Scan(&user.ID, &user.Username, &user.Email, &profilePic)
+	).Scan(&user.ID, &user.Username, &user.Email, &user.ProfilePic, &user.OAuthProvider, &user.OAuthID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Printf("No user found with ID: %s", userID)
@@ -29,7 +28,7 @@ func GetUserByID(db *sql.DB, userID string) (*User, error) {
 		return nil, err
 	}
 
-	user.ProfilePic = profilePic
+	// No need to assign ProfilePic as it's already scanned directly
 	log.Printf("Successfully fetched user: %s (%s)", user.Username, user.ID)
 	return &user, nil
 }

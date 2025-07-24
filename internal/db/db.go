@@ -4,14 +4,14 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 var Globaldb *sql.DB
 
 func InitializeDB() (*sql.DB, error) {
 	var err error
-	Globaldb, err = sql.Open("sqlite3", "./forum.db")
+	Globaldb, err = sql.Open("sqlite", "./forum.db")
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +106,12 @@ func InitializeDB() (*sql.DB, error) {
 	err = InsertDefaultCategories()
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert default categories: %v", err)
+	}
+
+	// Run database migrations
+	err = MigrateDB(Globaldb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run database migrations: %v", err)
 	}
 
 	return Globaldb, nil

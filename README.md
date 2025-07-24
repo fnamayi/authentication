@@ -11,6 +11,8 @@ This project is a web-based forum application that facilitates user communicatio
 
 - Login functionality with session management using cookies.
 
+- OAuth authentication with Google and GitHub.
+
 - Encrypted password storage (Bonus).
 
 - Session expiration handling.
@@ -42,9 +44,11 @@ This project is a web-based forum application that facilitates user communicatio
 
 - Database: SQLite
 
-- Authentication: Sessions and cookies 
+- Authentication: Sessions, cookies, and OAuth 2.0
 
-- Password Encryption: bcrypt 
+- Password Encryption: bcrypt
+
+- OAuth Providers: Google and GitHub
 
 - Containerization: Docker
    
@@ -94,7 +98,9 @@ $ go run .
 
 - Registration: Users can register by providing a unique email, username, and password. The system will return an error if the email is already taken.
 
-- Login: Registered users can log in using their credentials. Upon successful login, a session is created and managed via cookies.
+- Login: Registered users can log in using their credentials or through Google/GitHub OAuth. Upon successful login, a session is created and managed via cookies.
+
+- OAuth Authentication: Users can sign in with their Google or GitHub accounts. The system will create a new user account if one doesn't exist for the OAuth provider and ID.
 
 - Creating Posts: Logged-in users can create posts and associate them with one or more categories.
 

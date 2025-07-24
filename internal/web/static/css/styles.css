@@ -90,6 +90,85 @@ body {
     background: #0097a7;
 }
 
+/* OAuth login styles */
+.oauth-login {
+    margin-top: 25px;
+}
+
+.oauth-divider {
+    text-align: center;
+    position: relative;
+    margin: 15px 0;
+}
+
+.oauth-divider::before,
+.oauth-divider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 40%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.oauth-divider::before {
+    left: 0;
+}
+
+.oauth-divider::after {
+    right: 0;
+}
+
+.oauth-divider span {
+    display: inline-block;
+    padding: 0 10px;
+    background: #829a7a;
+    position: relative;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.oauth-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.oauth-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.google-btn {
+    background: rgba(255, 255, 255, 0.9);
+    color: #444;
+}
+
+.google-btn:hover {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.github-btn {
+    background: rgba(36, 41, 46, 0.9);
+    color: #fff;
+}
+
+.github-btn:hover {
+    background: #24292e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
 .register-link {
     text-align: center;
     margin-top: 20px;
