@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Messaging</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #result { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-top: 20px; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>Test Messaging System</h1>
+    <button onclick="testSendMessage()">Send Test Message</button>
+    <button onclick="testGetConversations()">Get Conversations</button>
+    <button onclick="testGetMessages()">Get Messages</button>
+    <div id="result">Click a button to test the messaging API...</div>
+
+    <script>
+        async function testSendMessage() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Sending message...';
+
+            try {
+                const response = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        recipientId: 'a737e8cf-9001-4500-af58-3b53d27be966',
+                        content: 'Hello topG! This is a test message from vosti! 🚀 The messaging system is working perfectly!'
+                    })
+                });
+
+                const data = await response.json();
+                resultDiv.innerHTML = `<h3>Send Message Result:</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function testGetConversations() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Getting conversations...';
+
+            try {
+                const response = await fetch('/api/conversations', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+                resultDiv.innerHTML = `<h3>Conversations Result:</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function testGetMessages() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Getting messages...';
+
+            try {
+                const response = await fetch('/api/messages/test-conv-1', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+                resultDiv.innerHTML = `<h3>Messages Result:</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,13 +1,12 @@
 module forum
 
-go 1.23.0
-
-toolchain go1.23.5
+go 1.21
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/mattn/go-sqlite3 v1.14.24
-	golang.org/x/crypto v0.37.0
+	github.com/gorilla/websocket v1.5.1
+	github.com/mattn/go-sqlite3 v1.14.22
+	golang.org/x/crypto v0.19.0
 )
 
-require github.com/DATA-DOG/go-sqlmock v1.5.2 // indirect
+require golang.org/x/net v0.21.0 // indirect
