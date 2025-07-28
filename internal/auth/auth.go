@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"forum/internal/database"
@@ -305,8 +306,212 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// InitializeOAuthProviders initializes OAuth providers (placeholder)
+// InitializeOAuthProviders initializes OAuth providers with environment variables
 func InitializeOAuthProviders() {
-	// OAuth initialization would go here
-	// For now, this is a placeholder to satisfy the main.go import
+	// Load environment variables and update OAuth configurations
+	initializeGitHubConfig()
+	initializeGoogleConfig()
+
+	// Log configuration status (without exposing secrets)
+	if GoogleConfig.ClientID != "" {
+		fmt.Printf("✅ Google OAuth configured with Client ID: %s...\n", GoogleConfig.ClientID[:10])
+	} else {
+		fmt.Println("⚠️  Google OAuth not configured (missing GOOGLE_CLIENT_ID)")
+	}
+
+	if GithubConfig.ClientID != "" {
+		fmt.Printf("✅ GitHub OAuth configured with Client ID: %s...\n", GithubConfig.ClientID[:10])
+	} else {
+		fmt.Println("⚠️  GitHub OAuth not configured (missing GITHUB_CLIENT_ID)")
+	}
 }
+
+// initializeGitHubConfig updates GitHub OAuth configuration with environment variables
+func initializeGitHubConfig() {
+	clientID := os.Getenv("GITHUB_CLIENT_ID")
+	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
+	redirectURL := os.Getenv("GITHUB_REDIRECT_URL")
+
+	if clientID != "" {
+		GithubConfig.ClientID = clientID
+	}
+	if clientSecret != "" {
+		GithubConfig.ClientSecret = clientSecret
+	}
+	if redirectURL != "" {
+		GithubConfig.RedirectURL = redirectURL
+	}
+}
+
+// initializeGoogleConfig updates Google OAuth configuration with environment variables
+func initializeGoogleConfig() {
+	clientID := os.Getenv("GOOGLE_CLIENT_ID")
+	clientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
+	redirectURL := os.Getenv("GOOGLE_REDIRECT_URL")
+
+	if clientID != "" {
+		GoogleConfig.ClientID = clientID
+	}
+	if clientSecret != "" {
+		GoogleConfig.ClientSecret = clientSecret
+	}
+	if redirectURL != "" {
+		GoogleConfig.RedirectURL = redirectURL
+	}
+}
+
+// GetUserByGithubID retrieves a user by their GitHub ID
+func GetUserByGithubID(githubID string) (*models.User, error) {
+	user := &models.User{}
+	err := database.DB.QueryRow(`
+		SELECT id, email, nickname, first_name, last_name, age, gender, google_id, github_id, avatar_url, created_at, updated_at
+		FROM users
+		WHERE github_id = ?
+	`, githubID).Scan(
+		&user.ID,
+		&user.Email,
+		&user.Nickname,
+		&user.FirstName,
+		&user.LastName,
+		&user.Age,
+		&user.Gender,
+		&user.GoogleID,
+		&user.GithubID,
+		&user.AvatarURL,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get user by GitHub ID: %v", err)
+	}
+
+	return user, nil
+}
+
+// CreateOrUpdateGithubUser creates a new user or updates existing user with GitHub info
+func CreateOrUpdateGithubUser(githubID, email, nickname, firstName, lastName, avatarURL string) (*models.User, error) {
+	// First, try to find existing user by GitHub ID
+	existingUser, err := GetUserByGithubID(githubID)
+	if err != nil {
+		return nil, err
+	}
+
+	if existingUser != nil {
+		// Update existing user's information
+		_, err = database.DB.Exec(`
+			UPDATE users
+			SET email = ?, nickname = ?, first_name = ?, last_name = ?, avatar_url = ?, updated_at = ?
+			WHERE github_id = ?
+		`, email, nickname, firstName, lastName, avatarURL, time.Now(), githubID)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to update GitHub user: %v", err)
+		}
+
+		// Return updated user
+		return GetUserByGithubID(githubID)
+	}
+
+	// Check if user exists by email
+	existingUserByEmail, err := GetUserByEmailOrNickname(email)
+	if err != nil {
+		return nil, err
+	}
+
+	if existingUserByEmail != nil {
+		// Link GitHub account to existing user
+		_, err = database.DB.Exec(`
+			UPDATE users
+			SET github_id = ?, avatar_url = ?, updated_at = ?
+			WHERE email = ?
+		`, githubID, avatarURL, time.Now(), email)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to link GitHub account: %v", err)
+		}
+
+		return GetUserByEmailOrNickname(email)
+	}
+
+	// Create new user
+	userID := uuid.New().String()
+
+	// Ensure nickname is unique by appending GitHub ID if needed
+	uniqueNickname := nickname
+	existingUserByNickname, err := GetUserByEmailOrNickname(nickname)
+	if err != nil {
+		return nil, err
+	}
+	if existingUserByNickname != nil {
+		uniqueNickname = nickname + "_gh" + githubID
+	}
+
+	// Generate a placeholder password for OAuth users (they won't use it for login)
+	placeholderPassword, err := HashPassword("oauth-user-" + githubID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate placeholder password: %v", err)
+	}
+
+	user := &models.User{
+		ID:        userID,
+		Email:     email,
+		Nickname:  uniqueNickname,
+		Password:  placeholderPassword,
+		FirstName: firstName,
+		LastName:  lastName,
+		Age:       18, // Default age for OAuth users
+		Gender:    "male", // Default gender - user can update later
+		GithubID:  &githubID,
+		AvatarURL: &avatarURL,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	_, err = database.DB.Exec(`
+		INSERT INTO users (id, email, nickname, password, first_name, last_name, age, gender, github_id, avatar_url, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, user.ID, user.Email, user.Nickname, user.Password, user.FirstName, user.LastName, user.Age, user.Gender, user.GithubID, user.AvatarURL, user.CreatedAt, user.UpdatedAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub user: %v", err)
+	}
+
+	return user, nil
+}
+
+// GetUserByEmail retrieves a user by their email address
+func GetUserByEmail(email string) (*models.User, error) {
+	user := &models.User{}
+	err := database.DB.QueryRow(`
+		SELECT id, email, nickname, first_name, last_name, age, gender, google_id, github_id, avatar_url, created_at, updated_at
+		FROM users
+		WHERE email = ?
+	`, email).Scan(
+		&user.ID,
+		&user.Email,
+		&user.Nickname,
+		&user.FirstName,
+		&user.LastName,
+		&user.Age,
+		&user.Gender,
+		&user.GoogleID,
+		&user.GithubID,
+		&user.AvatarURL,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get user by email: %v", err)
+	}
+
+	return user, nil
+}
+
