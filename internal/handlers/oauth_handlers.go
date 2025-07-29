@@ -25,15 +25,20 @@ func GoogleCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Exchange code for token
 	token, err := auth.GoogleConfig.Exchange(context.Background(), code)
 	if err != nil {
+		log.Printf("Google OAuth error - Failed to exchange token: %v", err)
 		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	client := auth.GoogleConfig.Client(context.Background(), token)
+
+	// Get user profile information
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
+		log.Printf("Google OAuth error - Failed to get user info: %v", err)
 		http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -41,13 +46,93 @@ func GoogleCallbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	var userInfo map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		log.Printf("Google OAuth error - Failed to parse user info: %v", err)
 		http.Error(w, "Failed to parse user info", http.StatusInternalServerError)
 		return
 	}
 
-	// Example: Print email to log
-	log.Printf("Google User: %v", userInfo["email"])
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+	// Extract user information
+	email, ok := userInfo["email"].(string)
+	if !ok || email == "" {
+		log.Printf("Google OAuth error - No email found in user info")
+		http.Error(w, "No email found in Google account", http.StatusBadRequest)
+		return
+	}
+
+	googleID, ok := userInfo["id"].(string)
+	if !ok || googleID == "" {
+		log.Printf("Google OAuth error - No Google ID found")
+		http.Error(w, "No Google ID found", http.StatusBadRequest)
+		return
+	}
+
+	// Extract name information
+	firstName := ""
+	lastName := ""
+	nickname := ""
+
+	if givenName, ok := userInfo["given_name"].(string); ok {
+		firstName = givenName
+	}
+
+	if familyName, ok := userInfo["family_name"].(string); ok {
+		lastName = familyName
+	}
+
+	// Use name as nickname, fallback to email prefix
+	if name, ok := userInfo["name"].(string); ok && name != "" {
+		// Remove spaces and special characters for nickname
+		nickname = strings.ReplaceAll(strings.ToLower(name), " ", "")
+		// Remove non-alphanumeric characters except underscores
+		nickname = strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+				return r
+			}
+			return -1
+		}, nickname)
+	}
+
+	if nickname == "" {
+		// Fallback to email prefix
+		emailParts := strings.Split(email, "@")
+		if len(emailParts) > 0 {
+			nickname = emailParts[0]
+		}
+	}
+
+	// Get avatar URL
+	avatarURL := ""
+	if picture, ok := userInfo["picture"].(string); ok {
+		avatarURL = picture
+	}
+
+	log.Printf("Google OAuth - Processing user: %s (%s)", nickname, email)
+
+	// Create or update user
+	user, err := auth.CreateOrUpdateGoogleUser(googleID, email, nickname, firstName, lastName, avatarURL)
+	if err != nil {
+		log.Printf("Google OAuth error - Failed to create/update user: %v", err)
+		http.Error(w, "Failed to create user account", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Google OAuth - User created/updated successfully: %s", user.ID)
+
+	// Create session
+	session, err := auth.CreateSession(user.ID)
+	if err != nil {
+		log.Printf("Google OAuth error - Failed to create session: %v", err)
+		http.Error(w, "Failed to create session", http.StatusInternalServerError)
+		return
+	}
+
+	// Set session cookie
+	auth.SetSessionCookie(w, session.ID)
+
+	log.Printf("Google OAuth - Login successful for user: %s", user.Nickname)
+
+	// Redirect to main page
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // ====== GITHUB ======
