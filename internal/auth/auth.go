@@ -515,3 +515,126 @@ func GetUserByEmail(email string) (*models.User, error) {
 	return user, nil
 }
 
+// GetUserByGoogleID retrieves a user by their Google ID
+func GetUserByGoogleID(googleID string) (*models.User, error) {
+	user := &models.User{}
+	err := database.DB.QueryRow(`
+		SELECT id, email, nickname, first_name, last_name, age, gender, google_id, github_id, avatar_url, created_at, updated_at
+		FROM users
+		WHERE google_id = ?
+	`, googleID).Scan(
+		&user.ID,
+		&user.Email,
+		&user.Nickname,
+		&user.FirstName,
+		&user.LastName,
+		&user.Age,
+		&user.Gender,
+		&user.GoogleID,
+		&user.GithubID,
+		&user.AvatarURL,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get user by Google ID: %v", err)
+	}
+
+	return user, nil
+}
+
+// CreateOrUpdateGoogleUser creates a new user or updates existing user with Google info
+func CreateOrUpdateGoogleUser(googleID, email, nickname, firstName, lastName, avatarURL string) (*models.User, error) {
+	// First, try to find existing user by Google ID
+	existingUser, err := GetUserByGoogleID(googleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if existingUser != nil {
+		// Update existing user's information
+		_, err = database.DB.Exec(`
+			UPDATE users
+			SET email = ?, nickname = ?, first_name = ?, last_name = ?, avatar_url = ?, updated_at = ?
+			WHERE google_id = ?
+		`, email, nickname, firstName, lastName, avatarURL, time.Now(), googleID)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to update Google user: %v", err)
+		}
+
+		// Return updated user
+		return GetUserByGoogleID(googleID)
+	}
+
+	// Check if user exists by email
+	existingUserByEmail, err := GetUserByEmailOrNickname(email)
+	if err != nil {
+		return nil, err
+	}
+
+	if existingUserByEmail != nil {
+		// Link Google account to existing user
+		_, err = database.DB.Exec(`
+			UPDATE users
+			SET google_id = ?, avatar_url = ?, updated_at = ?
+			WHERE email = ?
+		`, googleID, avatarURL, time.Now(), email)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to link Google account: %v", err)
+		}
+
+		return GetUserByEmailOrNickname(email)
+	}
+
+	// Create new user
+	userID := uuid.New().String()
+
+	// Ensure nickname is unique by appending Google ID if needed
+	uniqueNickname := nickname
+	existingUserByNickname, err := GetUserByEmailOrNickname(nickname)
+	if err != nil {
+		return nil, err
+	}
+	if existingUserByNickname != nil {
+		uniqueNickname = nickname + "_g" + googleID
+	}
+
+	// Generate a placeholder password for OAuth users (they won't use it for login)
+	placeholderPassword, err := HashPassword("oauth-user-google-" + googleID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate placeholder password: %v", err)
+	}
+
+	user := &models.User{
+		ID:        userID,
+		Email:     email,
+		Nickname:  uniqueNickname,
+		Password:  placeholderPassword,
+		FirstName: firstName,
+		LastName:  lastName,
+		Age:       18, // Default age for OAuth users
+		Gender:    "male", // Default gender - user can update later
+		GoogleID:  &googleID,
+		AvatarURL: &avatarURL,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	_, err = database.DB.Exec(`
+		INSERT INTO users (id, email, nickname, password, first_name, last_name, age, gender, google_id, avatar_url, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, user.ID, user.Email, user.Nickname, user.Password, user.FirstName, user.LastName, user.Age, user.Gender, user.GoogleID, user.AvatarURL, user.CreatedAt, user.UpdatedAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Google user: %v", err)
+	}
+
+	return user, nil
+}
+
